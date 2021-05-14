@@ -5,9 +5,8 @@
 Download msca-reqcert.sh to your /bin environment.
 
 ```bash
-
-chmod +x /bin/msca-reqcert.sh
-
+sudo curl https://raw.githubusercontent.com/davibaldin/msca-reqcert/main/msca-reqcert.sh -o /bin/msca-reqcert.sh
+sudo chmod +x /bin/msca-reqcert.sh
 ```
 
 ## Usage
