@@ -35,7 +35,7 @@ $ msca-reqcert.sh -s ca.contoso.ad -u "someuser@somedomain" -d "/C=BR/ST=Sao Pau
 
 ### Add corporate CA to trusted (Red Hat Like)
 
-Add your root CA and all yours sub-CAs [https://access.redhat.com/solutions/3220561](Read more)
+Add your root CA and all yours sub-CAs [Read more](https://access.redhat.com/solutions/3220561)
 
 ```bash
 msca-reqcert.sh -s ca.contoso.ad -u foo@bar -p 1234567 -c /etc/pki/ca-trust/source/anchors/ca-root.contoso.ad.pem
