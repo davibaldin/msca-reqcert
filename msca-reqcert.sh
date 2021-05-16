@@ -96,7 +96,7 @@ do
     esac
 done
 
-#echo "DEBUG 1 \n server = ${server}\n user = ${user}\n pass = ${pass}\n getca = ${getca}\n getcachain = ${getcachain}\n tpl = ${tpl}\n key = ${key}\n subj = ${subj}\n csr = ${csr}\n fqdn = ${fqdn}\n email = ${email}\n"
+#echo -e "DEBUG 1 \n server = ${server}\n user = ${user}\n pass = ${pass}\n getca = ${getca}\n getcachain = ${getcachain}\n tpl = ${tpl}\n key = ${key}\n subj = ${subj}\n csr = ${csr}\n fqdn = ${fqdn}\n email = ${email}\n"
 # Thanks to: https://stackoverflow.com/questions/31283476/submitting-base64-csr-to-a-microsoft-ca-via-curl
 
 
@@ -110,6 +110,32 @@ then
     CURL_HTTP1="--http1.1"
 fi
 
+function gen_san_file() {
+    cat > /tmp/${fqdn}.san <<EOF
+[ req ]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+[ req_distinguished_name ]
+countryName                = Country Name (2 letter code)
+stateOrProvinceName        = State or Province Name (full name)
+localityName               = Locality Name (eg, city)
+organizationName           = Organization Name (eg, company)
+commonName                 = Common Name (e.g. server FQDN or YOUR name)
+[ req_ext ]
+subjectAltName = @alt_names
+[alt_names]
+EOF
+
+SANID=1
+echo "DNS.${SANID} = ${fqdn}" >> /tmp/${fqdn}.san
+for name in ${SANATTRS}
+do
+    ((SANID=SANID+1))
+    echo "DNS.${SANID} = ${name}" >> /tmp/${fqdn}.san
+done
+
+}
 
 function get_ca_cert_chain() {
     curl ${CURL_HTTP1} -k -s -u "${user}":${pass} --ntlm -XGET \
@@ -131,7 +157,8 @@ function gen_priv_key() {
 }
 
 function gen_csr() {
-    openssl req -new -key ${key} -out /tmp/${fqdn}.csr -subj "${subj}/CN=${fqdn}/emailAddress=${email}"
+    gen_san_file
+    openssl req -new -key ${key} -out /tmp/${fqdn}.csr -subj "${subj}/CN=${fqdn}/emailAddress=${email}" -config /tmp/req.san
     return $?
 }
 
@@ -139,7 +166,7 @@ function req_certificate {
     CERT=`cat /tmp/${fqdn}.csr | tr -d '\n\r'`
     CERT=`echo ${CERT} | sed 's/+/%2B/g'`
     CERT=`echo ${CERT} | tr -s ' ' '+'`
-    CERTATTRIB="${SANATTRS}CertificateTemplate:${tpl}"
+    CERTATTRIB="CertificateTemplate:${tpl}"
     DATA="Mode=newreq&CertRequest=${CERT}&CertAttrib=${CERTATTRIB}&TargetStoreFlags=0&SaveCert=yes&ThumbPrint="
 
     curl ${CURL_HTTP1} -k -s -u "${user}":${pass} --ntlm -XGET \
@@ -160,6 +187,7 @@ function req_certificate {
 
      echo "Certificate issued. Certificate ID is $REQID, File is: ${writeto}"
      rm -f /tmp/${fqdn}.res
+     rm -f /tmp/${fqdn}.san
 }
 
 if [ -z "${server}" ]
@@ -247,17 +275,13 @@ then
     tpl="WebServer"
 fi
 
-
 if [ ! -z "${san}" ]
 then
     for str in ${san//,/ }
     do 
-        SANATTRS="${SANATTRS},dns=${str}"
+        SANATTRS="${SANATTRS} ${str}"
     done
     SANATTRS="${SANATTRS:1}"
-    SANATTRS=`echo ${SANATTRS} | sed 's/=/%3D/g'`
-    SANATTRS=`echo ${SANATTRS} | sed 's/,/%26/g'`
-    SANATTRS="san%3A${SANATTRS}%0D%0A"
 fi
 
 if [ ! -z "${csr}" ]
