@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # /*
 #  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -54,6 +54,9 @@ function show_usage()
     echo "                          If not provided hostmaster@fqdn will be used."
     echo "                          Ignored if csr file is provided."
     echo ""
+    echo " -w path                  Path to certificate file. If omitted, file will be create at current"
+    echo "                          directory as FQDN.cer filename."
+    echo ""
     echo " -h                       This message."
     echo ""
     echo "Examples:"
@@ -73,7 +76,7 @@ function show_usage()
     exit 0
 }
 
-while getopts s:u:p:c:i:t:k:r:d:n:m:a:h flag
+while getopts s:u:p:c:i:t:k:r:d:n:m:a:w:h flag
 do
     case "${flag}" in
         s) server=${OPTARG};;
@@ -88,6 +91,7 @@ do
         n) fqdn=${OPTARG};;
         m) email=${OPTARG};;
         a) san=${OPTARG};;
+        w) writeto=${OPTARG};;
         h) show_usage;;
     esac
 done
@@ -142,15 +146,21 @@ function req_certificate {
     "https://${server}/certsrv/certfnsh.asp" \
     --data "${DATA}" -o /tmp/${fqdn}.res
 
+    if [ ! -f "/tmp/${fqdn}.res" ]
+    then
+        echo "Certificate request failed. No response from CA server."
+        exit 2
+    fi
+
     REQID=`cat /tmp/${fqdn}.res | grep ReqID= | cut -d= -f 4 | cut -d\& -f1 | head -1`
 
     curl ${CURL_HTTP1} -k -s -u "${user}":${pass} --ntlm -XGET \
         "https://${server}/certsrv/certnew.cer?ReqID=${REQID}&Enc=b64" \
-        -o /tmp/${fqdn}.cer
+        -o ${writeto}
 
-     echo "Certificate issued. Certificate ID is $REQID, File is: /tmp/${fqdn}.cer"
+     echo "Certificate issued. Certificate ID is $REQID, File is: ${writeto}"
+     rm -f /tmp/${fqdn}.res
 }
-
 
 if [ -z "${server}" ]
 then
@@ -168,7 +178,7 @@ fi
 
 if [ -z "${pass}" ]
 then
-    echo "pass: \c"
+    echo -e "Password: \c"
     read -s pass
 fi
 
@@ -217,6 +227,9 @@ then
         echo "Key file doesn't exist. Creating a new private key."
         gen_priv_key ${key}
     fi
+else
+    echo "-k path/to/key.pem must be supplied. Use -h for usage."
+    exit 1
 fi
 
 if [ -z "${email}" ]
@@ -258,6 +271,18 @@ else
     gen_csr
     csr=/tmp/${fqdn}.csr
     echo "Created a new CSR file at ${csr}."
+fi
+
+if [ -z "${writeto}" ]
+then
+    dir=`pwd`
+    writeto="${dir}/${fqdn}.cer"
+else
+    if [ -d "${writeto}" ]
+    then
+        echo "Write to cannot be directory."
+        exit 4
+    fi
 fi
 
 #echo "DEBUG 2\n server = ${server}\n user = ${user}\n pass = ${pass}\n getca = ${getca}\n getcachain = ${getcachain}\n tpl = ${tpl}\n key = ${key}\n subj = ${subj}\n csr = ${csr}\n fqdn = ${fqdn}\n email = ${email}\n"
