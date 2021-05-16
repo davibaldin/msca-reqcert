@@ -158,7 +158,7 @@ function gen_priv_key() {
 
 function gen_csr() {
     gen_san_file
-    openssl req -new -key ${key} -out /tmp/${fqdn}.csr -subj "${subj}/CN=${fqdn}/emailAddress=${email}" -config /tmp/req.san
+    openssl req -new -key ${key} -out /tmp/${fqdn}.csr -subj "${subj}/CN=${fqdn}/emailAddress=${email}" -config /tmp/${fqdn}.san
     return $?
 }
 
